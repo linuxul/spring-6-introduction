@@ -1,0 +1,17 @@
+== 실습
+=== 개요
+Service의 유닛 테스트를 작성합니다. 
+
+=== 절차
+. ProductMaintenanceServiceImplTest 클래스의 내용을 살펴봅시다. update 메서드의 테스트 메서드가 있습니다.
+. 다음 메서드의 테스트 메서드를 작성하세요.
+.. findAll 메서드
+... 최소한 검색 결과가 예상대로 나오는지 확인합니다.
+.. findById 메서드
+... 적당한 ID로 검색하여 Product 객체의 내용이 예상과 일치하는지 확인합니다.
+
+. update 메서드의 테스트 메서드에서는 Mock의 ProductRepository의 update 메서드가 호출된 것은 확인할 수 있지만, 메서드의 인수로 전달된 Product 객체의 필드 값이 올바른지는 확인할 수 없으므로 Mockito의 ArgumentCaptor 클래스를 사용하여 확인해 봅시다.
+
+=== 옵션
+. OrderServiceImplTest의 test_placeOrder 메서드로도 Mock의 메서드의 인수로 전달된 객체에 대해서 필드의 값이 올바른지 확인할 수 없습니다. ArgumentCaptor 클래스를 사용하여 확인해 봅시다. 또한, Mock의 같은 메서드가 여러 번 호출된 경우에는 ArgumentCaptor의 getAllValues 메서드를 사용하여 호출된 수만큼의 인수의 객체를 List형 객체로 가져올 수 있습니다. 
+

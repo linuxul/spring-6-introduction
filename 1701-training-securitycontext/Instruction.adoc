@@ -1,0 +1,37 @@
+:imagesdir: images
+
+== 실습
+=== 개요
+Spring Security의 Security Context에 접속하여 로그인 중인 사용자의 정보를 가져옵니다.
+
+=== 절차
+. TrainingAdminController 클래스의 내용을 살펴보면, update 메서드의 인자로 사용자 정보를 가져옵니다. 여기서 사용자 ID를 가져와 TrainingAdminService 객체의 update 메서드에 전달하며, TrainingAdminService 객체의 update 메서드에서는 AuditLogService 객체의 registerLog 메서드를 호출하여 감사 로그에 사용자 ID가 포함되도록 하고 있습니다.
+
+. TrainingApplication 클래스를 실행하고, 브라우저에서 http://localhost:8080/admin/training/display-list 에 접속해 봅시다. 로그인 화면이 표시되므로 로그인 ID에 'taro', 비밀번호에 [taro123]을 입력하여 로그인합니다. 강의 목록 화면에서 적당한 강의 링크를 클릭하여 강의 업데이트를 완료하면 감사 로그가 등록됩니다. audit_log 테이블의 내용을 확인하기 위해 H2 데이터베이스에 액세스하는 콘솔을 사용합니다. http://localhost:8080/h2-console 에 접속합니다. 아래와 같은 로그인 화면이 표시됩니다.
++ 
+image::h2-login.png[]
++ 
+아래의 로그인 정보를 입력하세요.
++ 
+|===
+| 항목 | 값
+
+| 드라이버 클래스 | org.h2.Driver
+| JDBC URL | jdbc:h2:mem:testdb
+| 사용명 | sa
+| 비밀번호 | (비어 있음)
+|===
++
+로그인하면 다음과 같은 화면이 표시됩니다.
++
+image::h2-console.png[]
++ 
+왼쪽 상단의 'AUDIT_LOG'를 클릭하면 텍스트 영역에 SELECT 문장이 자동으로 작성됩니다. 이후 '실행' 버튼을 누르면, 레코드가 표시될 것입니다.
+
+. 사용자 ID를 Controller에서 가져오는 것보다 AuditLogServiceImpl에서 가져오는 것이 더 스마트합니다.  Controller나 Service의 인수로 사용자 정보를 받을 필요가 없어집니다. 어떻게 하면 될까요?
+.. [팁]AuditLogServiceImpl 안에서 다음과 같은 소스코드를 작성하면 사용자 ID를 가져올 수 있습니다.
++
+----
+Authentication authentication = SecurityContextHolder.getContext().getAuthentication(); 
+String userId = authentication.getName(); 
+----

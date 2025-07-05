@@ -1,0 +1,12 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title>강의 등록 완료</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+        <h1>강의 등록 완료</h1>
+        <div th:if="${trainingId != null}">등록한 강의ID「<span th:text="${trainingId}"></span>」</div>
+        <a th:href="@{/admin/training/display-list}">강의 목록으로 돌아가기</a>
+    </body>
+</html>

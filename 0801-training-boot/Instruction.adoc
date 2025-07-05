@@ -1,0 +1,28 @@
+:imagesdir: images
+
+== 실습
+=== 개요
+스프링 부트의 자동 설정 기능을 사용하면 설정의 번거로움이 크게 줄어드는 것을 확인합니다.
+
+=== 절차
+. pom.xml의 내용을 살펴봅시다. <dependencies> 태그 안에 spring-boot-starter-jdbc라는 아티팩트가 지정되어 있습니다. 이 아티팩트를 지정하는 것만으로 스프링의 라이브러리와 데이터베이스 접근, 트랜잭션 제어를 위한 라이브러리를 사용할 수 있게 됩니다.
+
+. TrainingApplication 클래스의 내용을 살펴봅시다. 스프링 부트의 자동 설정을 사용하지 않으므로 DataSource, JdbcTemplate, platformTransactionManager의 Bean 정의를 하고 있습니다.
+
+. TrainingApplication 클래스를 자동 설정을 이용하는 방식으로 수정하고, DI 컨테이너 생성은 AutomaticConfigApplicationContext 클래스를 사용하지 않고 SpringApplication 클래스의 run 메서드를 사용하며, DataSource, JdbcTemplate, TransactionManager의 Bean 정의는 더 이상 필요하지 않으므로 삭제하고, 스프링 부트는 클래스 경로 바로 아래에 있는 'schema.sql', 'data.sql'을 자동으로 불러오므로 명시적으로 지정할 필요는 없습니다.
+
+. TrainingApplication 클래스를 실행합니다. 잘 동작하면 콘솔 화면에 트랜잭션을 제어하는 로그가 출력됩니다.
+
+. src/main/resources 폴더 아래에 application.properties 파일을 생성하고 아래와 같이 작성해 봅시다.
++
+----
+logging.level.org.springframework.jdbc.core.JdbcTemplate=DEBUG
+----
++ 
+다시 TrainingApplication 클래스를 실행하면, 실행된 SQL이 콘솔에 출력됩니다. 스프링 부트가 로그 관련 설정을 커스터마이징하여 JdbcTemplate 클래스의 로거의 로그 레벨을 변경할 수 있다는 것을 확인할 수 있습니다.
+덧붙여, 로거의 이름은 아래 빨간색 테두리 부분에서 확인할 수 있습니다.
+
+image::log-sample.png[test image]
+
+
+

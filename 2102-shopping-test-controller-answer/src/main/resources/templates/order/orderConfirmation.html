@@ -1,0 +1,55 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>주문확정</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+</head>
+<body>
+<h1>주문확정</h1>
+<form th:action="@{/order/place-order}" , method="post" th:object="${orderInput}">
+  <table>
+    <tr>
+      <th>이름</th>
+      <td><span th:text="*{name}"></span></td>
+    </tr>
+    <tr>
+      <th>주소</th>
+      <td><span th:text="*{address}"></span></td>
+    </tr>
+    <tr>
+      <th>전화번호</th>
+      <td><span th:text="*{phone}"></span></td>
+    </tr>
+    <tr>
+      <th>이메일</th>
+      <td><span th:text="*{emailAddress}"></span></td>
+    </tr>
+    <tr>
+      <th>결제방법</th>
+      <td>
+        <span th:if="*{paymentMethod != null && paymentMethod.toString() == 'BANK'}">계좌이체</span>
+        <span th:if="*{paymentMethod != null && paymentMethod.toString() == 'CONVENIENCE_STORE'}">편의점결제</span>
+      </td>
+    </tr>
+  </table>
+  <div>아래와 같이 주문합니다.</div>
+  <table>
+    <tr>
+      <th>상품명</th>
+      <th>가격</th>
+      <th>수량</th>
+    </tr>
+    <tr th:each="item:${cartInput.cartItemInputs}">
+      <td th:text="${item.productName}"></td>
+      <td><span th:text="${item.productPrice}"></span>원</td>
+      <td th:text="${item.quantity}"></td>
+    </tr>
+  </table>
+  <div>합계금액:<span th:text="${cartInput.totalAmount}"></span>원</div>
+  <div>청구금액:<span th:text="${cartInput.billingAmount}"></span>원(세금포함)</div>
+
+  <input name="order" type="submit" value="주문확정"/>
+  <input name="correct" type="submit" value="주문내용변경"/>
+</form>
+</body>
+</html>

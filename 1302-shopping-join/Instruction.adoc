@@ -1,0 +1,13 @@
+== 실습
+=== 개요
+RowMapper 인터페이스를 사용하여 일대다 JOIN한 결과를 객체로 변환합니다.
+
+=== 절차
+. JdbcOrderItemRepository 클래스의 내용을 살펴봅시다. selectById 메서드가 구현은 되어 있지만, JOIN한 레코드의 데이터가 제대로 객체(OrderItem 객체가 Product 객체를 가진 상태)에 매핑될까요? 
+
+. 제대로 객체에 맵핑되도록 수정합시다. RowMapper 인터페이스를 구현한 클래스를 작성해야 합니다. 수정했으면 TrainingApplication 클래스의 main 메서드 안에서 selectById 메서드를 호출하여 객체의 내용을 확인합시다.
+
+=== 옵션
+
+. JdbcOrderRepository 클래스의 selectById 메서드로 일대다 관계의 객체(Order 객체가 복수의 OrderItem 객체를 가진 상태)로 맵핑하도록 수정합시다.
+.. 【보충】PaymentMethod는 enum형이지만, JDBC는 enum형 변환을 지원하지 않습니다. 그러므로 rs.getObject("칼럼명", PaymentMethod.class)라고 기술할 수 없습니다. 그 대신, PaymentMethod.valueOf(rs.getString("칼럼명"))이라고 기술하면 됩니다.

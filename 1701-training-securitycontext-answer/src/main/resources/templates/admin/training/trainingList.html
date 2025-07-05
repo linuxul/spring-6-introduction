@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+  <title>강의 목록</title>
+</head>
+<body>
+<div sec:authorize="isAuthenticated()">
+  안녕하세요：<span sec:authentication="name"></span>님
+  <form th:action="@{/logout}" method="post">
+    <input type="submit" value="로그아웃"/>
+  </form>
+</div>
+<h1>강의 목록</h1>
+<div>안녕하세요 <span sec:authentication="principal.username"></span>님</div>
+<table border="1">
+  <tr>
+    <th>강의ID</th>
+    <th>강의명</th>
+    <th>시작일자</th>
+    <th>종료일자</th>
+    <th>신청인원</th>
+    <th>정원</th>
+  </tr>
+  <tr th:each="training:${trainingList}">
+    <td><span th:text="${training.id}"></span></td>
+    <td><a th:href="@{/admin/training/display-update-form(trainingId=${training.id})}"><span
+            th:text="${training.title}"></span></a></td>
+    <td><span th:text="${#temporals.format(training.startDateTime, 'yyyy/MM/dd HH:mm')}"></span>
+    </td>
+    <td><span th:text="${#temporals.format(training.endDateTime, 'yyyy/MM/dd HH:mm')}"></span></td>
+    <td><span th:text="${training.reserved}"></span></td>
+    <td><span th:text="${training.capacity}"></span></td>
+  </tr>
+</table>
+<div sec:authorize="hasRole('ADMIN')">
+  <a th:href="@{/admin/training/display-registration-form}">신규등록</a>
+</div>
+</body>
+</html>

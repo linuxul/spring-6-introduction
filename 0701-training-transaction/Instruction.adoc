@@ -1,0 +1,11 @@
+== 실습
+=== 개요
+스프링을 사용하여 간편하게 트랜잭션 제어를 할 수 있는지 확인합니다.
+
+=== 절차
+. TrainingApplication 클래스를 실행해 봅시다. main 메서드 마지막 부분에서 업무 로직인 reserve 메서드가 호출되고 있습니다. 콘솔 화면을 보면 특별히 트랜잭션이 제어되고 있다는 로그는 출력되지 않습니다.
+
+. ReservationServiceImpl 클래스에 트랜잭션 제어를 위한 애너테이션을 추가하고 다시 TrainingApplication 클래스를 실행해 봅시다. 트랜잭션 제어의 시작을 의미하는 'Creating new transaction with name...'과 트랜잭션의 커밋을 의미하는 'Committing JDBC transaction on Connection...'이라는 로그가 출력될 것입니다.
+
+. 디버거의 중단점을 사용하여 main 메서드의 중간에서 처리를 멈추고 reservationService 변수의 구상 클래스 이름을 살펴봅시다(변수 위에 마우스 커서를 올리면 표시된다). $Proxy... 라는 이름으로 되어 있다면, 스프링이 자동으로 생성한 Proxy가 되어 있다는 증거입니다.
+

@@ -1,0 +1,25 @@
+== 실습
+
+=== 개요
+프로파일을 사용하여 설정을 전환합니다.
+
+=== 절차
+. TrainingApplication 클래스의 main 메서드를 실행해 봅시다. 'expected single matching bean but found 2'라는 오류 메시지가 표시됩니다. 이는 TrainingServiceImpl 객체가 주입하려는 TrainingRepository 타입의 객체가 DI 컨테이너에 두 개 존재하기 때문입니다(JdbcTrainingRepository 객체와 E xternalTrainingRepository 객체).
+
+. JdbcTrainingRepository 클래스와 ExternalTrainingRepository 클래스를 별도의 프로파일로 그룹화합시다. 프로파일명은 임의로 지정합니다.
+
+. 프로파일로 그룹화했으면, 프로파일명 중 하나를 활성화합니다. 활성화된 프로파일을 지정하기 위해서는 DI 컨테이너 생성 전에 다음과 같은 처리를 추가합니다.
+
++
+----
+System.setProperty("spring.profiles.active", "프로파일명"); 
+----
++
+
+"System.setProperty(...)"는 Java의 시스템 프로퍼티를 지정하는 기술입니다. 원래는 Java 명령어 옵션으로 시스템 프로퍼티를 지정하는 편이 좋지만, 이번에는 간단히 하고자 프로그램 내에서 지정하는 형태로 합니다.
+지정한 프로파일명에 따라 JdbcTrainingRepository 객체와 ExternalTrainingRepository 객체 중 하나가 사용되어 작동할 것입니다.
+
+
+
+
+

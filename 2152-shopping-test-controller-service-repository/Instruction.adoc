@@ -1,0 +1,13 @@
+== 실습
+=== 개요
+Controller, Service, Repository의 인티그레이션 테스트를 작성합니다.
+
+=== 절차
+. CatalogControllerIntegrationTest 클래스의 내용을 살펴봅시다. '/catalog/display-list' 요청에 대한 테스트 메서드가 이미 생성되어 있습니다. '/catalog/display-details' 요청에 대한 테스트 메서드를 추가해 보세요.
+
+. OrderControllerIntegrationTest 클래스의 내용을 살펴보면, test_order 메서드는 OrderController 클래스의 order 메서드를 테스트하기 위한 테스트 메서드입니다. 세션 스코프에 저장할 OrderSession 객체는 준비되었지만, MockMvc 객체의 perform 메서드 호출이나 어설션이 작성되어 있지 않으므로 test_order 메서드를 완성해 봅시다. 어설션에서 다음을 확인합니다.
+
+.. 발급된 주문 ID를 사용하여 주문 데이터를 검색하고, 검색된 주문 데이터의 고객 이름과 주소가 예상과 일치하는지 확인합니다.
+
+=== 옵션
+. 재고가 부족할 때 예상되는 화면이 표시되는지 확인하는 테스트 메서드를 추가해 봅시다.

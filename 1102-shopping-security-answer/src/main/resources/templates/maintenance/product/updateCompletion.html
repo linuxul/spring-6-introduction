@@ -1,0 +1,12 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title>상품갱신완료</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+        <h1>상품갱신완료</h1>
+        <div th:if="${productId != null}">갱신한 상품 ID「<span th:text="${productId}"></span>」</div>
+        <a th:href="@{/maintenance/product/display-list}">상품 목록으로 돌아가기</a>
+    </body>
+</html>

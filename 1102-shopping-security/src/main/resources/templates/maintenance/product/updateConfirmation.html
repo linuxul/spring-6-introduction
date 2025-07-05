@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>상품갱신확인</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+</head>
+<body>
+<h1>상품갱신확인</h1>
+<form th:action="@{/maintenance/product/update}" method="post"
+      th:object="${productMaintenanceInput}">
+  <table>
+    <tr>
+      <th>상품ID</th>
+      <td>
+        <span th:text="*{id}"></span>
+      </td>
+    </tr>
+    <tr>
+      <th>상품명</th>
+      <td>
+        <span th:text="*{name}"></span>
+      </td>
+    </tr>
+    <tr>
+      <th>가격</th>
+      <td>
+        <span th:text="*{price}"></span>원
+      </td>
+    </tr>
+    <tr>
+      <th>재고수량</th>
+      <td>
+        <span th:text="*{stock}"></span>
+      </td>
+    </tr>
+  </table>
+  <input type="hidden" th:field="*{id}"/>
+  <input type="hidden" th:field="*{name}"/>
+  <input type="hidden" th:field="*{price}"/>
+  <input type="hidden" th:field="*{stock}"/>
+
+  <input type="submit" name="correct" value="돌아가기"/>
+  <input type="submit" name="update" value="갱신"/>
+</form>
+</body>
+</html>

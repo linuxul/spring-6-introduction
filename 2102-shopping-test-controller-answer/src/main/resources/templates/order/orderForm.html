@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title>주문양식</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+        <h1>주문양식</h1>
+        <form th:action="@{/order/validate-input}" method="post" th:object="${orderInput}">
+            <table>
+                <tr>
+                    <th>이름</th>
+                    <td><input type="text" th:field="*{name}" /><div th:errors="*{name}"></div></td>
+                </tr>
+                <tr>
+                    <th>주소</th>
+                    <td><input type="text" th:field="*{address}" /><div th:errors="*{address}"></div></td>
+                </tr>
+                <tr>
+                    <th>전화번호</th>
+                    <td><input type="text" th:field="*{phone}" /><div th:errors="*{phone}"></div></td>
+                </tr>
+                <tr>
+                    <th>이메일</th>
+                    <td><input type="text" th:field="*{emailAddress}" /><div th:errors="*{emailAddress}"></div></td>
+                </tr>
+                <tr>
+                    <th>결제방법</th>
+                    <td>
+                        <input type="radio" id="bankRadio" value="BANK" th:field="*{paymentMethod}"/>
+                        <label for="bankRadio">계좌이체</label>
+                        <input type="radio" id="convenienceStoreRadio" value="CONVENIENCE_STORE" th:field="*{paymentMethod}"/>
+                        <label for="convenienceStoreRadio">편이점결제</label>
+                    </td>
+                </tr>
+            </table>
+            <input type="submit" value="주문내용확인" />
+        </form>
+    </body>
+</html>

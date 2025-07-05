@@ -1,0 +1,14 @@
+== 실습
+=== 개요
+REST API를 제공하는 테스트 클래스를 생성하고, Controller의 단위 테스트와 통합 테스트를 작성합니다.
+
+=== 절차
+. TrainingAdminRestControllerTest 클래스를 실행해 봅시다. 테스트가 통과할 것입니다. 무엇을 테스트하는지 이해가 되시나요?
+
+. TrainingAdminRestController 클래스의 getTrainings(1개가 아닌 여러 개의 데이터를 가져오는) 메서드를 테스트하는 테스트 메서드를 만들어 봅시다.
+
+. TrainingAdminRestControllerIntegrationTestMockMvc 테스트를 실행해 봅시다. 테스트가 통과할 것입니다. 테스트 메서드를 추가하여 ID를 지정하고 교육 데이터 1건을 조회하는 API를 테스트해 봅시다.
+
+. TrainingAdministratorControllerIntegrationTestApServer 테스트를 실행해 봅시다. 테스트가 통과할 것입니다. 테스트 메서드를 추가하여 ID를 지정하여 교육 데이터 1건을 조회하는 API를 테스트해 봅시다.
+
+. 각각의 테스트 클래스는 Controller의 처리를 기점으로 하여 테스트하고 있는데, 어떤 차이가 있을까요?

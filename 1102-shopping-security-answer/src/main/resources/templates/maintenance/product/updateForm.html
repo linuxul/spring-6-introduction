@@ -1,0 +1,46 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+    <head>
+        <title>상품갱신</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+        <h1>상품갱신</h1>
+        <form th:action="@{/maintenance/product/validate-update-input}" method="post" th:object="${productMaintenanceInput}">
+            <table>
+                <tr>
+                    <th>상품 ID</th>
+                    <td>
+                        <span th:text="*{id}"></span>
+                        <input type="hidden" th:field="*{id}" />
+                    </td>
+                </tr>
+                <tr>
+                    <th>상품명</th>
+                    <td>
+                        <input type="text" th:field="*{name}" />
+                        <div th:errors="*{name}"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>가격</th>
+                    <td>
+                        <input type="text" th:field="*{price}">원
+                        <div th:errors="*{price}"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <th>재고수량</th>
+                    <td>
+                        <input type="text" th:field="*{stock}" />
+                        <div th:errors="*{stock}"></div>
+                    </td>
+                </tr>
+            </table>
+            <div sec:authorize="hasRole('MANAGER')">
+                <input type="submit" value="갱신"/>
+            </div>
+            <a th:href="@{/maintenance/product/display-list}">상품 목록으로 돌아가기</a>
+        </form>
+    </body>
+</html>

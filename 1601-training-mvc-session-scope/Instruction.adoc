@@ -1,0 +1,10 @@
+== 실습
+=== 개요
+세션 스코프를 사용하여 프로그램을 확인합니다.
+
+=== 절차
+. ReservationController 클래스의 내용을 확인해 봅시다. 세션 스코프를 사용하고 있습니다. 이전(세션 스코프를 사용하기 전)과 비교했을 때, 어떻게 달라졌나요?
+
+. 확인 화면을 표시하고 있는 reservationConfirmation.html의 내용을 살펴보겠습니다. 이전에는 <input type="hidden"...으로 사용자가 입력한 값을 화면에 유지했지만, 현재는 유지하지 않습니다. 왜 그런지 알 수 있나요?
+
+. TrainingApplication 클래스를 실행하고 http://localhost:8080/training/display-list 에 접속하여 동작을 확인해 봅시다. 문제 없이 예약이 진행될 것입니다.

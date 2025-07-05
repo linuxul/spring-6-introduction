@@ -1,0 +1,17 @@
+== 실습
+=== 개요
+Repository의 유닛 테스트를 작성합니다.
+
+=== 절차
+. JdbcProductRepository 클래스의 테스트 클래스를 작성합시다.  테스트용  SQL 파일은 src/test/resources 아래의 JdbcProductRepositoryTest.sql에 준비되어 있습니다.  아래에 제시된 JdbcProductRepository 클래스의 메서드를 테스트해 보세요. 
+.. selectAll 메서드 
+... 최저 획득 건수가 기대한 만큼 나오는지 확인합니다.
+.. selectById 메서드 
+... 적당한 ID로 검색하여 Product 객체의 내용이 예상과 일치하는지 확인합니다.
+.. update 메서드
+... 해당 ID의 데이터를 업데이트하고 t_product 테이블의 레코드가 예상대로 변경되는지 확인합니다.
+
+
+=== 옵션 
+. JdbcOrderRepository 클래스의 테스트 클래스를 작성해 봅시다. 
+

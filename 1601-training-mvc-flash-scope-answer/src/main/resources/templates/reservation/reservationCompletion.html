@@ -1,0 +1,12 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <title>신청완료</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+        <h1>신청 완료</h1>
+        <div th:if="${reservation != null}">신청 ID「<span th:text="${reservation.id}"></span>」</div>
+        <a th:href="@{/training/display-list}">강의 목록으로 돌아가기</a>
+    </body>
+</html>

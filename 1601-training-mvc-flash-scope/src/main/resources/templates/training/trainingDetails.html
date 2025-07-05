@@ -1,0 +1,39 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>강의 상세 정보</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+</head>
+<body>
+<h1>강의 상세 정보</h1>
+<table>
+  <tr>
+    <th>강의명</th>
+    <td><span th:text="${training.title}"></span></td>
+  </tr>
+  <tr>
+    <th>시작일자</th>
+    <td><span th:text="${#temporals.format(training.startDateTime, 'yyyy/MM/dd HH:mm')}">300</span>
+    </td>
+  </tr>
+  <tr>
+    <th>종료일자</th>
+    <td><span th:text="${#temporals.format(training.endDateTime, 'yyyy/MM/dd HH:mm')}">10</span>
+    </td>
+  </tr>
+  <tr>
+    <th>신청인원</th>
+    <td><span th:text="${training.reserved}"></span></td>
+  </tr>
+  <tr>
+    <th>정원</th>
+    <td><span th:text="${training.capacity}"></span></td>
+  </tr>
+</table>
+<form th:action="@{/reservation/display-form}" method="get">
+  <input type="hidden" name="trainingId" th:value="${training.id}"/>
+  <input type="submit" value="수강신청"/>
+</form>
+<a th:href="@{/training/display-list}">강의 목록으로 돌아가기</a>
+</body>
+</html>

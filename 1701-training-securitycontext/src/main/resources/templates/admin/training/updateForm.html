@@ -1,0 +1,62 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+  <title>강의 갱신</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+</head>
+<body>
+<h1>강의 갱신</h1>
+<form th:action="@{/admin/training/validate-update-input}" method="post"
+      th:object="${trainingAdminInput}">
+  <table>
+    <tr>
+      <th>강의ID</th>
+      <td>
+        <span th:text="*{id}"></span>
+        <input type="hidden" th:field="*{id}"/>
+      </td>
+    </tr>
+    <tr>
+      <th>강의명</th>
+      <td>
+        <input type="text" th:field="*{title}"/>
+        <div th:errors="*{title}"></div>
+      </td>
+    </tr>
+    <tr>
+      <th>시작일자</th>
+      <td>
+        <input type="text" th:field="*{startDateTime}">
+        <div th:errors="*{startDateTime}"></div>
+      </td>
+    </tr>
+    <tr>
+      <th>종료일자</th>
+      <td>
+        <input type="text" th:field="*{endDateTime}"/>
+        <div th:errors="*{endDateTime}"></div>
+      </td>
+    </tr>
+    <tr>
+      <th>신청인원</th>
+      <td>
+        <input type="text" th:field="*{reserved}"/>
+        <div th:errors="*{reserved}"></div>
+      </td>
+    </tr>
+    <tr>
+      <th>정원</th>
+      <td>
+        <input type="text" th:field="*{capacity}"/>
+        <div th:errors="*{capacity}"></div>
+      </td>
+    </tr>
+  </table>
+  <div sec:authorize="hasRole('ADMIN')">
+    <input type="submit" value="업데이트"/>
+  </div>
+  <a th:href="@{/admin/training/display-list}">강의 목록으로 돌아가기</a>
+</form>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <title>신청 확인</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+</head>
+<body>
+<h1>신청 확인</h1>
+<form th:action="@{/reservation/reserve}" , method="post" th:object="${reservationInput}">
+  <table>
+    <tr>
+      <th>이름</th>
+      <td><span th:text="*{name}"></span></td>
+    </tr>
+    <tr>
+      <th>전화번호</th>
+      <td><span th:text="*{phone}"></span></td>
+    </tr>
+    <tr>
+      <th>이메일</th>
+      <td><span th:text="*{emailAddress}"></span></td>
+    </tr>
+    <tr>
+      <th>수강생 유형</th>
+      <td><span th:text="${studentType.name}"></span></td>
+    </tr>
+  </table>
+  <div>아래의 강의를 신청합니다.</div>
+  <table>
+    <tr>
+      <th>강의명</th>
+      <td><span th:text="${training.title}"></span></td>
+    </tr>
+    <tr>
+      <th>시작일자</th>
+      <td><span th:text="${training.startDateTime}"></span></td>
+    </tr>
+    <tr>
+      <th>종료일자</th>
+      <td><span th:text="${training.endDateTime}"></span></td>
+    </tr>
+  </table>
+  <input name="reserve" type="submit" value="신청내용확인"/>
+  <input name="correct" type="submit" value="신청내용변경"/>
+</form>
+</body>
+</html>
