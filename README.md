@@ -295,4 +295,61 @@ fun openPhotoPicker() {
 	•	바로 Bitmap(썸네일) → TakePicturePreview() (큰 이미지가 필요 없을 때)
 	•	데이터 형태: 표시(Glide/Coil)는 Uri, 업로드는 Uri → InputStream/ByteArray, 편집은 Bitmap으로 변환 후
 
-원하시면 위 코드를 모듈화된 유틸 클래스(촬영 시작, Uri→Bitmap/Byte 변환, EXIF 회전, MediaStore 저장)로 깔끔하게 묶어서 드릴게요. 타깃 SDK/최소 SDK와 “단일/다중 촬영” 여부만 알려주시면 맞춤 버전으로 정리해 드리겠습니다.
+원하시면 위 코드를 모듈화된 유틸 클래스(촬영 시작, Uri→B
+itmap/Byte 변환, EXIF 회전, MediaStore 저장)로 깔끔하게 묶어서 드릴게요. 타깃 SDK/최소 SDK와 “단일/다중 촬영” 여부만 알려주시면 맞춤 버전으로 정리해 드리겠습니다.
+
+import android.content.ContentValues
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+
+class CameraSampleActivity : AppCompatActivity() {
+
+    private lateinit var outputUri: Uri
+
+    // 촬영 계약: 성공하면 true, outputUri 위치에 파일이 저장됨
+    private val takePicture = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            // ✅ 촬영 결과 Uri 확보
+            onImageCaptured(outputUri)
+        } else {
+            // 취소/실패 처리
+        }
+    }
+
+    /** 호출 시: MediaStore에 미리 파일 자리 만들고 그 Uri로 촬영 시작 */
+    fun startCameraToMediaStore() {
+        createMediaStoreImageUri()?.let { uri ->
+            outputUri = uri
+            takePicture.launch(outputUri)
+        } ?: run {
+            // Uri 생성 실패 처리
+        }
+    }
+
+    /** MediaStore에 이미지 항목을 미리 추가하고 그 Uri를 반환 */
+    private fun createMediaStoreImageUri(): Uri? {
+        val name = "IMG_${System.currentTimeMillis()}.jpg"
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10+에서 갤러리 하위 폴더 지정
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MyApp")
+            }
+        }
+        return contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values
+        )
+    }
+
+    private fun onImageCaptured(uri: Uri) {
+        // 여기서 uri로 표시/업로드/처리
+        // 예) Glide.with(this).load(uri).into(imageView)
+        // 예) contentResolver.openInputStream(uri)로 바이트 읽기
+    }
+}
