@@ -353,3 +353,45 @@ class CameraSampleActivity : AppCompatActivity() {
         // 예) contentResolver.openInputStream(uri)로 바이트 읽기
     }
 }
+
+private lateinit var videoUri: Uri
+
+// 결과: 지정한 Uri에 비디오가 저장됨
+private val takeVideo = registerForActivityResult(
+    ActivityResultContracts.CaptureVideo()
+) { success ->
+    if (success) {
+        onVideoCaptured(videoUri) // ✅ 촬영된 비디오 Uri
+    }
+}
+
+fun startVideoCapture() {
+    videoUri = createVideoUri()!!
+    takeVideo.launch(videoUri)
+}
+
+/** MediaStore에 비디오 자리 미리 만들기 */
+private fun createVideoUri(): Uri? {
+    val values = ContentValues().apply {
+        put(MediaStore.Video.Media.DISPLAY_NAME, "VID_${System.currentTimeMillis()}.mp4")
+        put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/MyApp")
+        }
+    }
+    return contentResolver.insert(
+        MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values
+    )
+}
+
+private fun onVideoCaptured(uri: Uri) {
+    // (A) 비디오 재생
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, "video/*")
+        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+    }
+    startActivity(intent)
+
+    // (B) 업로드/처리: contentResolver.openInputStream(uri) 사용
+}
+
