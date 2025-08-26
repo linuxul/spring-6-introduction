@@ -1,139 +1,298 @@
-Doze 모드 (Android 6+)
-화면 꺼짐·충전 안 함·기기 미사용 시, 네트워크 접근이 주기적으로만 허용됩니다. 백그라운드 서비스의 네트워크 호출이 지연됨.
-앱 대기(App Standby)
-장기간 사용하지 않은 앱은 네트워크 접근이 제한되고, FCM high-priority 외 요청이 늦게 처리.
-배터리 최적화
-백그라운드에서 네트워크 호출이 중단·지연될 수 있음. IGNORE_BATTERY_OPTIMIZATION_SETTINGS로 예외 요청 가능.
-제조사 커스텀 절전 정책 (삼성, 샤오미 등)
-OS 표준보다 더 강하게 백그라운드 네트워크를 차단할 수 있음. “절전 앱” 목록에 들어가면 FCM조차 지연.
-백그라운드 제한 설정 (사용자 설정)
-앱이 아예 백그라운드에서 실행되지 않음 → 네트워크도 당연히 끊김.
-
-좋아요—Vite 사용 시 APK가 .apk로 정확히 내려가고, 내부망 폰에서도 접속되도록 딱 필요한 설정만 정리했습니다.
-핵심은 public/에 APK 두기 + Vite에서 .apk 요청에 올바른 헤더를 주는 것입니다.
+아래는 안드로이드에서 카메라로 촬영 → 앱에서 데이터(URI/Bitmap/ByteArray) 얻는 대표 패턴 3가지입니다. 타깃 SDK 33+ 기준으로 안전한 방식 위주(권한 최소화)로 정리했어요.
 
 ⸻
 
-1) 프로젝트에 APK 두기
+0) 공통 준비 (권한 & FileProvider)
 
-your-vite-project/
-  public/
-    downloads/
-      app-release-1.2.3.apk
+<!-- AndroidManifest.xml -->
+<uses-permission android:name="android.permission.CAMERA"/>
 
-빌드 후 경로: /downloads/app-release-1.2.3.apk
+<application ...>
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.provider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/file_paths"/>
+    </provider>
+</application>
+
+res/xml/file_paths.xml
+
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="camera_cache" path="camera/"/>
+    <external-files-path name="pictures" path="Pictures/"/>
+</paths>
+
+저장·선택은 MediaStore/포토 피커를 쓰면 추가 저장소 권한이 거의 필요 없습니다.
 
 ⸻
 
-2) vite.config.ts (dev/preview 공통 헤더 적용)
+1) Activity Result API – TakePicture() (권장)
+	•	결과: 촬영 이미지를 Uri로 받음 (파일 저장됨)
+	•	장점: 큰 이미지(고해상도) 안전 처리, OOM 적음
 
-Vite dev 서버(개발)와 vite preview(빌드 검증)에서 모두 .apk에 MIME/다운로드 헤더를 셋팅합니다.
-또한 같은 네트워크의 휴대폰 접속을 위해 host: true 설정을 켜줍니다.
+class CameraActivity : AppCompatActivity() {
 
-// vite.config.ts
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import path from 'path'
+    private lateinit var outputUri: Uri
 
-function apkHeaderMiddleware() {
-  return {
-    name: 'apk-headers',
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        if (req.url?.endsWith('.apk')) {
-          res.setHeader('Content-Type', 'application/vnd.android.package-archive')
-          res.setHeader('Content-Disposition', `attachment; filename="${path.basename(req.url)}"`)
-          res.setHeader('X-Content-Type-Options', 'nosniff')
+    private val takePicture = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            // 1) Uri 그대로 사용 (업로드/표시/처리)
+            onImageCaptured(outputUri)
+        } else {
+            // 취소/실패
         }
-        next()
-      })
     }
-  }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // 바로 MediaStore에 pre-insert (갤러리에 자동 반영, 권장)
+        outputUri = createMediaStoreImageUri()!!
+        takePicture.launch(outputUri)
+    }
+
+    private fun onImageCaptured(uri: Uri) {
+        // (A) 이미지 표시: Glide/Coil에 uri 전달
+        // Glide.with(this).load(uri).into(imageView)
+
+        // (B) ByteArray가 필요하다면:
+        val bytes = readBytes(uri)
+        // (C) Bitmap이 필요하다면(주의: 크면 샘플링 권장):
+        val bitmap = loadSampledBitmap(uri, maxSize = 2048)
+    }
+
+    private fun createMediaStoreImageUri(): Uri? {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "IMG_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MyApp")
+            }
+        }
+        return contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values
+        )
+    }
+
+    private fun readBytes(uri: Uri): ByteArray =
+        contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+
+    private fun loadSampledBitmap(uri: Uri, maxSize: Int): Bitmap {
+        // ① 이미지 크기만 먼저 읽기
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        contentResolver.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it, null, opts) }
+
+        // ② 샘플링 비율 계산
+        val (w, h) = opts.outWidth to opts.outHeight
+        var sample = 1
+        while (w / sample > maxSize || h / sample > maxSize) sample *= 2
+
+        // ③ 실제 디코딩
+        val opts2 = BitmapFactory.Options().apply { inSampleSize = sample }
+        return contentResolver.openInputStream(uri)!!.use {
+            BitmapFactory.decodeStream(it, null, opts2)!!
+        }
+    }
 }
 
-export default defineConfig({
-  plugins: [vue(), apkHeaderMiddleware()],
-  server: {
-    host: true,        // 0.0.0.0 바인드 → 같은 Wi-Fi 폰에서 접속 가능
-    port: 5173,
-    headers: {         // 전역 보강(선택)
-      'X-Content-Type-Options': 'nosniff'
-    }
-  },
-  preview: {
-    host: true,
-    port: 5174,
-    headers: {
-      'X-Content-Type-Options': 'nosniff'
-    }
-  }
-})
-
-접속 예:
-
-개발:   http://<맥IP>:5173/downloads/app-release-1.2.3.apk
-프리뷰: http://<맥IP>:5174/downloads/app-release-1.2.3.apk
-
-주의: HTTP 환경에서는 크롬의 “안전하지 않은 다운로드” 경고는 뜹니다(정상).
-경고까지 없애려면 내부망이라도 HTTPS(+사설 CA 설치)가 필요합니다.
+TakePicturePreview()는 Bitmap을 바로 주지만 해상도가 낮을 수 있어 썸네일 용도에 적합합니다.
 
 ⸻
 
-3) 프로덕션 배포(정적 서버) 옵션
+2) 인텐트 방식 – ACTION_IMAGE_CAPTURE (+ EXTRA_OUTPUT)
+	•	결과: EXTRA_OUTPUT로 넘긴 Uri에 저장
+	•	주의: 오래된 방식이지만 여전히 호환성 좋음. Activity Result API와 함께 쓰면 안전.
 
-(A) vite build + Nginx
-
-Vite로 빌드 후 Nginx에서 정적 서빙하며 .apk에 헤더를 보강합니다.
-
-server {
-  listen 8080;
-  server_name _;
-
-  root /var/www/myapp/dist;
-  index index.html;
-
-  # APK MIME 매핑
-  types { application/vnd.android.package-archive apk; }
-
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-
-  # APK 헤더 보강
-  location ~* \.apk$ {
-    add_header Content-Disposition 'attachment; filename="$request_filename"';
-    add_header X-Content-Type-Options nosniff;
-  }
+private val captureIntent = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+) { res ->
+    if (res.resultCode == Activity.RESULT_OK) {
+        onImageCaptured(outputUri) // 위 예제의 재사용
+    }
 }
 
-(B) vite preview로 간단 검증
+private lateinit var outputUri: Uri
 
-npm run build
-npm run preview    # 5174로 서비스
+fun startCameraWithIntent() {
+    val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+    outputUri = createTempFileUri() // FileProvider로 캐시에 임시 파일
+    intent.putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
+    intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    captureIntent.launch(intent)
+}
 
-위 vite.config.ts의 preview.headers가 적용됩니다.
+private fun createTempFileUri(): Uri {
+    val dir = File(cacheDir, "camera").apply { mkdirs() }
+    val file = File(dir, "IMG_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(this, "$packageName.provider", file)
+}
 
-⸻
-
-4) 간단한 다운로드 페이지(선택)
-
-public/index.html에 링크만 추가해도 배포가 편해집니다.
-
-<ul>
-  <li><a href="/downloads/app-release-1.2.3.apk" download>APK 다운로드 v1.2.3</a></li>
-</ul>
-<p>설치 안내: 설정 &gt; 보안 &gt; 알 수 없는 앱 설치 &gt; (사용 브라우저) 허용</p>
-
-
-⸻
-
-5) 폰에서 접속 안 될 때 체크
-	•	Vite dev/preview에 host: true 설정했는지
-	•	맥 방화벽에서 5173/5174 허용했는지 (시스템 설정 > 보안 및 개인 정보 보호 > 방화벽)
-	•	같은 서브넷(예: 192.168.0.x)인지
-	•	파일명에 공백/한글 없는지 (app-release-1.2.3.apk 권장)
-	•	브라우저 캐시 문제 시 강력 새로고침
+촬영 후 이미지를 MediaStore에 등록하고 싶으면, 캐시 파일을 copy → insert하는 단계를 추가하세요.
 
 ⸻
 
-필요하시면 Nginx로 운영 배포 또는 내부망 HTTPS(사설 CA) 템플릿도 바로 드릴게요.
+3) CameraX – 직접 프리뷰 & 촬영 제어 (앱 내 카메라 UX)
+	•	결과: 저장된 파일의 Uri / 경로를 얻어 처리
+	•	장점: 앱 내 카메라 UI, 연속 촬영, 해상도/회전/플래시 제어
+	•	의존성:
+
+implementation "androidx.camera:camera-core:<latest>"
+implementation "androidx.camera:camera-camera2:<latest>"
+implementation "androidx.camera:camera-lifecycle:<latest>"
+implementation "androidx.camera:camera-view:<latest>"
+implementation "androidx.camera:camera-extensions:<latest>"
+
+class CameraXActivity : AppCompatActivity() {
+    private lateinit var imageCapture: ImageCapture
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val previewView = PreviewView(this)
+        setContentView(previewView)
+
+        // 권한 확인 후 실행
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            startCamera(previewView)
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startCamera(findViewById(android.R.id.content).rootView as PreviewView)
+        }
+
+    private fun startCamera(previewView: PreviewView) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.addListener({
+            val provider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+            imageCapture = ImageCapture.Builder()
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .build()
+
+            provider.unbindAll()
+            provider.bindToLifecycle(
+                this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture
+            )
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    fun takePhoto() {
+        // MediaStore에 바로 저장(권장)
+        val name = "IMG_${System.currentTimeMillis()}.jpg"
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MyApp")
+            }
+        }
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(
+            contentResolver,
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            contentValues
+        ).build()
+
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    // 에러 처리
+                }
+                override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                    val savedUri = result.savedUri!!
+                    onImageCaptured(savedUri) // 위 공통 처리 재사용
+                }
+            }
+        )
+    }
+}
+
+
+⸻
+
+4) 얻은 데이터 활용 팁
+
+(A) EXIF 회전 보정 (직접 Bitmap 처리 시)
+
+fun rotateIfNeeded(context: Context, uri: Uri, bitmap: Bitmap): Bitmap {
+    val input = context.contentResolver.openInputStream(uri)!!
+    val exif = ExifInterface(input)
+    val orientation = exif.getAttributeInt(
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.ORIENTATION_NORMAL
+    )
+    input.close()
+
+    val matrix = Matrix()
+    val degrees = when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> 90
+        ExifInterface.ORIENTATION_ROTATE_180 -> 180
+        ExifInterface.ORIENTATION_ROTATE_270 -> 270
+        else -> 0
+    }
+    if (degrees != 0) matrix.postRotate(degrees.toFloat())
+    return if (degrees != 0) Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    else bitmap
+}
+
+(B) JPEG 압축하여 ByteArray 만들기
+
+fun bitmapToJpegBytes(bm: Bitmap, quality: Int = 85): ByteArray =
+    ByteArrayOutputStream().use { out ->
+        bm.compress(Bitmap.CompressFormat.JPEG, quality, out)
+        out.toByteArray()
+    }
+
+(C) 큰 파일 업로드 전 리사이즈
+
+fun resizeBitmap(bm: Bitmap, maxWidth: Int, maxHeight: Int): Bitmap {
+    val ratio = minOf(maxWidth / bm.width.toFloat(), maxHeight / bm.height.toFloat())
+    if (ratio >= 1f) return bm
+    val w = (bm.width * ratio).toInt()
+    val h = (bm.height * ratio).toInt()
+    return Bitmap.createScaledBitmap(bm, w, h, true)
+}
+
+
+⸻
+
+5) 갤러리로부터 “가져오기” (참고)
+	•	시스템 포토 피커(권장, 권한 불필요)
+
+private val pickPhoto = registerForActivityResult(
+    ActivityResultContracts.PickVisualMedia()
+) { uri ->
+    if (uri != null) onImageCaptured(uri) // 동일 처리
+}
+
+fun openPhotoPicker() {
+    pickPhoto.launch(
+        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+    )
+}
+
+
+
+⸻
+
+6) 요약 선택지
+	•	고화질 촬영 + 안전한 저장 + 간단 처리 → TakePicture()로 Uri 받기 (권장)
+	•	앱 내 카메라 UX 필요 → CameraX (프리뷰·연속촬영·플래시 등 제어)
+	•	바로 Bitmap(썸네일) → TakePicturePreview() (큰 이미지가 필요 없을 때)
+	•	데이터 형태: 표시(Glide/Coil)는 Uri, 업로드는 Uri → InputStream/ByteArray, 편집은 Bitmap으로 변환 후
+
+원하시면 위 코드를 모듈화된 유틸 클래스(촬영 시작, Uri→Bitmap/Byte 변환, EXIF 회전, MediaStore 저장)로 깔끔하게 묶어서 드릴게요. 타깃 SDK/최소 SDK와 “단일/다중 촬영” 여부만 알려주시면 맞춤 버전으로 정리해 드리겠습니다.
