@@ -487,3 +487,34 @@ suspend fun saveToDownloadsThenShare(
 	•	✅ SAF(ACTION_CREATE_DOCUMENT)로 저장한 Uri를 공유할 때는 IS_PENDING 개념이 적용되지 않습니다(바로 공유 가능).
 
 필요하시면 여러 파일 일괄 저장 후 일괄 공유(모두 IS_PENDING=0 전환 완료 → ACTION_SEND_MULTIPLE) 버전도 바로 구성해드릴게요.
+
+
+
+import android.content.ContentUris
+import android.content.Context
+import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import java.io.File
+
+fun getDownloadFileUri(context: Context, file: File): Uri? {
+    // MediaStore에서 파일명으로 검색
+    val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME)
+
+    val selection = "${MediaStore.Downloads.DISPLAY_NAME}=?"
+    val selectionArgs = arrayOf(file.name)
+
+    context.contentResolver.query(
+        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+        projection,
+        selection,
+        selectionArgs,
+        null
+    ).use { cursor ->
+        if (cursor != null && cursor.moveToFirst()) {
+            val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID))
+            return ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id)
+        }
+    }
+    return null
+}
