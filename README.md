@@ -518,3 +518,199 @@ fun getDownloadFileUri(context: Context, file: File): Uri? {
     }
     return null
 }
+
+좋아요. Uri가 이미지/영상/애니GIF 무엇이든 “썸네일 Bitmap”을 알아서 뽑아주는 통합 유틸을 드릴게요.
+아래 코드는 Kotlin + Glide 4.16.0 기준이며, content://, file://, http(s):// 모두 지원합니다.
+
+⸻
+
+Gradle
+
+dependencies {
+    implementation "com.github.bumptech.glide:glide:4.16.0"
+    kapt "com.github.bumptech.glide:compiler:4.16.0"
+}
+
+
+⸻
+
+통합 유틸 (한 파일로 복붙)
+
+@file:Suppress("unused")
+
+package your.pkg
+
+import android.content.ContentResolver
+import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
+import android.webkit.MimeTypeMap
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.Target
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+/**
+ * MIME으로 미디어 타입 추론
+ */
+private enum class MediaKind { IMAGE, GIF, VIDEO, UNKNOWN }
+
+private fun kindFromMime(mime: String?): MediaKind = when {
+    mime == null -> MediaKind.UNKNOWN
+    mime.startsWith("image/") && mime != "image/gif" -> MediaKind.IMAGE
+    mime == "image/gif" -> MediaKind.GIF
+    mime.startsWith("video/") -> MediaKind.VIDEO
+    else -> MediaKind.UNKNOWN
+}
+
+/**
+ * Uri의 mimeType 얻기 (content:// 우선, 그 외엔 확장자 추론)
+ */
+private fun Context.resolveMimeType(uri: Uri): String? {
+    return when (uri.scheme) {
+        ContentResolver.SCHEME_CONTENT -> contentResolver.getType(uri)
+        ContentResolver.SCHEME_FILE, "http", "https" -> {
+            val ext = MimeTypeMap.getFileExtensionFromUrl(uri.toString())
+            if (ext.isNullOrBlank()) null
+            else MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase())
+        }
+        else -> null
+    }
+}
+
+/**
+ * 어떤 Uri든 적절히 처리하여 "썸네일 Bitmap"을 반환
+ *
+ * - 이미지: asBitmap() 그대로 로드
+ * - GIF:   asBitmap() → 첫 프레임 썸네일(정적) 반환
+ * - 동영상: asBitmap().frame(timeUs) → 지정 프레임 썸네일 반환
+ *
+ * @param uri             이미지/영상/애니GIF/원격URL/로컬 모두 가능
+ * @param reqWidth        썸네일 목표 가로(px). 메모리 절약/성능 위해 반드시 지정 권장
+ * @param reqHeight       썸네일 목표 세로(px)
+ * @param videoFrameUs    동영상 썸네일을 뽑을 프레임 시점(마이크로초). 기본 1초 지점.
+ * @param exactSize       true면 정확히 reqWidth×reqHeight로 강제(센터크롭), false면 비율 유지 축소
+ */
+suspend fun Context.loadUniversalThumbnailBitmap(
+    uri: Uri,
+    reqWidth: Int = 512,
+    reqHeight: Int = 512,
+    videoFrameUs: Long = 1_000_000L,
+    exactSize: Boolean = false
+): Bitmap = suspendCancellableCoroutine { cont ->
+    val mime = resolveMimeType(uri)
+    val kind = kindFromMime(mime)
+
+    // 공통 옵션: 다운샘플링 + 사이즈 제한
+    val baseOptions = RequestOptions()
+        .downsample(DownsampleStrategy.AT_MOST) // 원본 과대 로딩 방지
+        .override(reqWidth, reqHeight)
+        .apply {
+            if (exactSize) centerCrop() else fitCenter()
+        }
+
+    val rm = Glide.with(this)
+    val builder = when (kind) {
+        MediaKind.IMAGE -> {
+            // 정적 이미지
+            rm.asBitmap()
+                .apply(baseOptions)
+                .load(uri)
+        }
+        MediaKind.GIF -> {
+            // GIF: asBitmap()은 첫 프레임 Bitmap 반환 → 썸네일 용도로 적합
+            rm.asBitmap()
+                .apply(baseOptions)
+                .dontAnimate() // 첫 프레임 뽑을 때 불필요한 애니 방지
+                .load(uri)
+        }
+        MediaKind.VIDEO -> {
+            // 동영상: 특정 시점 프레임 썸네일
+            rm.asBitmap()
+                .apply(baseOptions)
+                .frame(videoFrameUs) // 마이크로초 단위 (예: 1_000_000L = 1초)
+                .load(uri)
+        }
+        MediaKind.UNKNOWN -> {
+            // MIME 추정 실패: 가장 보편적인 경로로 시도 (이미지→비디오 순)
+            // 1차: 이미지처럼 시도
+            rm.asBitmap()
+                .apply(baseOptions)
+                .load(uri)
+        }
+    }
+
+    val future = builder.submit(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL)
+
+    cont.invokeOnCancellation {
+        rm.clear(future)
+    }
+
+    Thread {
+        try {
+            val bmp = future.get() // Glide 내부 스레드풀 사용 → 여기선 단순 대기
+            if (cont.isActive) cont.resume(bmp)
+        } catch (e: Exception) {
+            if (e is CancellationException) {
+                // 취소 시 clear()는 invokeOnCancellation에서 처리
+            } else {
+                if (cont.isActive) cont.resumeWithException(e)
+            }
+        } finally {
+            rm.clear(future)
+        }
+    }.start()
+}
+
+
+⸻
+
+사용 예시
+
+// Activity/Fragment
+lifecycleScope.launch {
+    try {
+        // 1) 갤러리 등에서 받은 content:// Uri
+        val bmp1 = applicationContext.loadUniversalThumbnailBitmap(
+            uri = contentUri, reqWidth = 512, reqHeight = 512
+        )
+        imageView.setImageBitmap(bmp1)
+
+        // 2) 동영상: 3초 지점 프레임
+        val bmp2 = applicationContext.loadUniversalThumbnailBitmap(
+            uri = videoUri, reqWidth = 640, reqHeight = 360, videoFrameUs = 3_000_000L
+        )
+        videoThumb.setImageBitmap(bmp2)
+
+        // 3) 원격 GIF: 첫 프레임 썸네일
+        val bmp3 = applicationContext.loadUniversalThumbnailBitmap(
+            uri = Uri.parse("https://example.com/anim.gif"),
+            reqWidth = 400, reqHeight = 400
+        )
+        gifThumb.setImageBitmap(bmp3)
+
+    } catch (t: Throwable) {
+        Toast.makeText(this@MainActivity, "썸네일 실패: ${t.message}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+
+⸻
+
+구현 팁 & 주의사항
+	•	비디오 프레임 추출 실패 시(일부 코덱/원격 URL)에는 videoFrameUs를 0 또는 더 큰 값으로 바꿔 재시도하세요.
+	•	OOM 예방: override()는 반드시 쓰는 걸 권장합니다. 원본 크기 로드는 피하세요.
+	•	GIF 전체 재생이 필요하면 ImageView에는 asGif()를 사용하세요(이 유틸은 썸네일만 반환).
+	•	권한: 갤러리/SAF가 돌려준 content://는 보통 추가 권한 없이 읽기 가능. 직접 파일경로 접근은 지양.
+	•	정확한 크기 강제: 그리드 썸네일처럼 정확히 자르려면 exactSize=true로 두고, 레이아웃에 맞춰 centerCrop 사용.
+
+필요하시면 동시에 여러 Uri를 썸네일화(병렬/배치) 하거나, 결과를 JPEG/WEBP로 파일 저장하는 유틸도 이어서 만들어 드릴게요.
+
+
+
+
+
