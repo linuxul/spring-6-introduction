@@ -1,4 +1,4 @@
-아래는 안드로이드에서 카메라로 촬영 → 앱에서 데이터(URI/Bitmap/ByteArray) 얻는 대표 패턴 3가지입니다. 타깃 SDK 33+ 기준으로 안전한 방식 위주(권한 최소화)로 정리했어요.
+#아래는 안드로이드에서 카메라로 촬영 → 앱에서 데이터(URI/Bitmap/ByteArray) 얻는 대표 패턴 3가지입니다. 타깃 SDK 33+ 기준으로 안전한 방식 위주(권한 최소화)로 정리했어요.
 
 ⸻
 
@@ -395,3 +395,95 @@ private fun onVideoCaptured(uri: Uri) {
     // (B) 업로드/처리: contentResolver.openInputStream(uri) 사용
 }
 
+
+
+
+좋습니다. Downloads 저장 → 공유 흐름에서 IS_PENDING을 언제 0으로 바꿔야 하는지 정확한 타이밍은 아래처럼 하시면 됩니다.
+
+타이밍 원칙 (요점)
+	1.	insert 시 IS_PENDING=1 로 등록
+	2.	전부 쓰기 완료 후(스트림 flush/close까지 끝난 직후) IS_PENDING=0 으로 업데이트
+	3.	그 다음에 공유 인텐트 실행 (ACTION_SEND)
+
+즉, 공유를 띄우기 전에 반드시 0으로 변경해야 합니다. 그래야 다른 앱이 해당 content://에 접근할 수 있어요.
+
+⸻
+
+안전한 구현 패턴 (코루틴 + 예외 롤백 포함)
+
+suspend fun saveToDownloadsThenShare(
+    context: Context,
+    url: String,
+    displayName: String,
+    mime: String
+) = withContext(Dispatchers.IO) {
+    val resolver = context.contentResolver
+    val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+
+    // 1) IS_PENDING=1 로 빈 항목 생성
+    val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+        put(MediaStore.MediaColumns.MIME_TYPE, mime)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/") // 필요 시 하위 폴더
+        }
+    }
+    val uri = resolver.insert(collection, values) ?: error("insert failed")
+
+    try {
+        // 2) 네트워크 → 파일 쓰기 (완전히 끝날 때까지)
+        val req = Request.Builder().url(url).build()
+        OkHttpClient().newCall(req).execute().use { resp ->
+            require(resp.isSuccessful) { "HTTP ${resp.code}" }
+            val input = resp.body?.byteStream() ?: error("empty body")
+
+            // (A) 일반 OutputStream 경로
+            resolver.openOutputStream(uri)?.use { out ->
+                input.copyTo(out)
+                out.flush() // 중요
+            } ?: error("openOutputStream failed")
+
+            // (B) 더 안전하게 fsync까지 하고 싶다면(선택):
+            // resolver.openFileDescriptor(uri, "w")?.use { pfd ->
+            //     FileOutputStream(pfd.fileDescriptor).channel.force(true) // fsync 유사
+            // }
+        }
+
+        // 3) 쓰기가 전부 끝났다면 노출
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val done = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            resolver.update(uri, done, null, null)
+        }
+
+        // 4) 이제 공유 (메인 스레드에서 실행)
+        withContext(Dispatchers.Main) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }.also { intent ->
+                context.startActivity(Intent.createChooser(intent, "공유"))
+            }
+        }
+    } catch (e: Throwable) {
+        // 실패 시 깨끗이 롤백
+        resolver.delete(uri, null, null)
+        throw e
+    }
+}
+
+왜 이 순서가 중요한가?
+	•	IS_PENDING=1 상태에서는 다른 앱이 보거나 열 수 없습니다.
+	•	공유 대상 앱(Gmail/카카오톡/드라이브 등)이 파일을 읽으려면, 공유 인텐트를 띄우기 전에 IS_PENDING=0 으로 전환되어 있어야 합니다.
+
+⸻
+
+자주 하는 실수 & 팁
+	•	❌ 쓰기 도중(아직 IS_PENDING=1)에 공유를 띄움 → 상대 앱이 빈 파일/접근 실패
+	•	✅ openOutputStream(...).use { ... } 블록이 완전히 끝난 다음에 0으로 업데이트
+	•	✅ 가능하면 MIME 정확히 지정 (application/pdf, image/jpeg, video/mp4 등)
+	•	✅ Android 9 이하에서는 IS_PENDING이 없으므로 단순 insert→쓰기 후 곧바로 공유(단, 권한 정책 유의)
+	•	✅ SAF(ACTION_CREATE_DOCUMENT)로 저장한 Uri를 공유할 때는 IS_PENDING 개념이 적용되지 않습니다(바로 공유 가능).
+
+필요하시면 여러 파일 일괄 저장 후 일괄 공유(모두 IS_PENDING=0 전환 완료 → ACTION_SEND_MULTIPLE) 버전도 바로 구성해드릴게요.
