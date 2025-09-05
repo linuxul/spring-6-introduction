@@ -903,3 +903,94 @@ lifecycleScope.launch {
 	•	정확한 크기 강제: 그리드 썸네일처럼 정확히 자르려면 exactSize=true로 두고, 레이아웃에 맞춰 centerCrop 사용.
 
 필요하시면 동시에 여러 Uri를 썸네일화(병렬/배치) 하거나, 결과를 JPEG/WEBP로 파일 저장하는 유틸도 이어서 만들어 드릴게요.
+
+
+import okhttp3.Headers
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.nio.charset.Charset
+
+/**
+ * 주어진 바이트 배열 리스트(datas), 파일명 리스트(fileNames), MIME 리스트(mimeTypes)를 이용해
+ * MultipartBody.Part 목록을 생성
+ *
+ * - name 파라미터는 서버 스펙에 맞게 "imageFile"로 고정 (필요 시 "imageFile[]" 등으로 변경)
+ * - Content-Disposition 헤더에 filename과 filename* (EUC-KR) 모두 세팅
+ */
+fun buildMultipartPartsWithEucKrFilename(
+    datas: List<ByteArray>,
+    fileNames: List<String>,
+    mimeTypes: List<String>,
+    formFieldName: String = "imageFile"
+): List<MultipartBody.Part> {
+    require(datas.size == fileNames.size && fileNames.size == mimeTypes.size) {
+        "datas, fileNames, mimeTypes 크기가 동일해야 합니다."
+    }
+
+    val eucKr = Charset.forName("EUC-KR")
+    val parts = mutableListOf<MultipartBody.Part>()
+
+    for (i in datas.indices) {
+        val data = datas[i]
+        val fileName = fileNames[i]
+        val mime = mimeTypes[i]
+
+        // 1) 파일 본문
+        val body: RequestBody = data.toRequestBody(mime.toMediaTypeOrNull())
+
+        // 2) 파일명 EUC-KR 인코딩
+        val fileNameEucKrBytes = fileName.toByteArray(eucKr)
+
+        // 3) RFC 5987 스타일 percent-encoding (EUC-KR 바이트 기준)
+        val fileNameStar = "EUC-KR''" + percentEncodeBytes(fileNameEucKrBytes)
+
+        // 4) Content-Disposition 헤더 구성
+        //   - filename="<EUC-KR 인코딩 문자열>"
+        //   - filename*=EUC-KR''<percent-encoded>
+        //   ※ 일부 서버/라이브러리는 둘 중 하나만 인식하므로 두 개 모두 제공
+        val contentDisposition = buildString {
+            append("form-data; ")
+            append("name=\"").append(formFieldName).append("\"; ")
+            append("filename=\"").append(String(fileNameEucKrBytes, eucKr)).append("\"; ")
+            append("filename*=").append(fileNameStar)
+        }
+
+        val headers = Headers.headersOf(
+            "Content-Disposition", contentDisposition,
+            "Content-Type", mime
+        )
+
+        // 5) Part 생성 (헤더 강제 지정)
+        val part = MultipartBody.Part.create(headers, body)
+        parts.add(part)
+    }
+
+    return parts
+}
+
+/**
+ * EUC-KR 바이트 배열을 RFC 5987 규칙에 맞춰 percent-encoding
+ * - 안전 문자(알파벳/숫자/일부 특수문자) 외에는 %HH 로 인코딩
+ */
+private fun percentEncodeBytes(bytes: ByteArray): String {
+    val sb = StringBuilder()
+    for (b in bytes) {
+        val c = b.toInt() and 0xFF
+        val isUnreserved = (c in 'a'.code..'z'.code) ||
+                (c in 'A'.code..'Z'.code) ||
+                (c in '0'.code..'9'.code) ||
+                c == '-'.code || c == '.'.code || c == '_'.code || c == '~'.code
+        if (isUnreserved) {
+            sb.append(c.toChar())
+        } else {
+            sb.append('%')
+            sb.append(((c shr 4) and 0xF).toString(16).uppercase())
+            sb.append((c and 0xF).toString(16).uppercase())
+        }
+    }
+    return sb.toString()
+}
+
+
